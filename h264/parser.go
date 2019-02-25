@@ -16,6 +16,89 @@ const (
 	NALU_AUD = 9
 )
 
+const (
+	NALU_RAW = iota
+	NALU_AVCC
+	NALU_ANNEXB
+)
+
+func SplitNALUs(b []byte) (nalus [][]byte, typ int) {
+	if len(b) < 4 {
+		return [][]byte{b}, NALU_RAW
+	}
+
+	val3 := pio.U24BE(b)
+	val4 := pio.U32BE(b)
+
+	// maybe AVCC
+	if val4 <= uint32(len(b)) {
+		_val4 := val4
+		_b := b[4:]
+		nalus := [][]byte{}
+		for {
+			nalus = append(nalus, _b[:_val4])
+			_b = _b[_val4:]
+			if len(_b) < 4 {
+				break
+			}
+			_val4 = pio.U32BE(_b)
+			_b = _b[4:]
+			if _val4 > uint32(len(_b)) {
+				break
+			}
+		}
+		if len(_b) == 0 {
+			return nalus, NALU_AVCC
+		}
+	}
+
+	// is Annex B
+	if val3 == 1 || val4 == 1 {
+		_val3 := val3
+		_val4 := val4
+		start := 0
+		pos := 0
+		for {
+			if start != pos {
+				nalus = append(nalus, b[start:pos])
+			}
+			if _val3 == 1 {
+				pos += 3
+			} else if _val4 == 1 {
+				pos += 4
+			}
+			start = pos
+			if start == len(b) {
+				break
+			}
+			_val3 = 0
+			_val4 = 0
+			for pos < len(b) {
+				if pos+2 < len(b) && b[pos] == 0 {
+					_val3 = pio.U24BE(b[pos:])
+					if _val3 == 0 {
+						if pos+3 < len(b) {
+							_val4 = uint32(b[pos+3])
+							if _val4 == 1 {
+								break
+							}
+						}
+					} else if _val3 == 1 {
+						break
+					}
+					pos++
+				} else {
+					pos++
+				}
+			}
+		}
+		typ = NALU_ANNEXB
+		return
+	}
+
+	return [][]byte{b}, NALU_RAW
+}
+
 func IsDataNALU(b []byte) bool {
 	typ := b[0] & 0x1f
 	return typ >= 1 && typ <= 5
