@@ -57,6 +57,7 @@ func main() {
 		if ch == nil {
 			ch = &Channel{}
 			ch.que = pubsub.NewQueue()
+			ch.que.SetMaxGopCount(1)
 			channels[conn.URL.Path] = ch
 		}
 		l.Unlock()
