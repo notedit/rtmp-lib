@@ -1,37 +1,89 @@
 package main
 
 import (
+	"sync"
+
+	"github.com/notedit/rtmp-lib/av"
+
 	rtmp "github.com/notedit/rtmp-lib"
+	"github.com/notedit/rtmp-lib/pubsub"
 )
+
+type Channel struct {
+	que *pubsub.Queue
+}
+
+var channels = map[string]*Channel{}
 
 func main() {
 
-	server := &rtmp.Server{}
+	l := &sync.RWMutex{}
 
-	var publisherConn *rtmp.Conn
+	server := &rtmp.Server{}
 
 	server.HandlePlay = func(conn *rtmp.Conn) {
 
-		streams, err := publisherConn.Streams()
+		l.RLock()
+		ch := channels[conn.URL.Path]
+		l.RUnlock()
 
-		if err != nil {
-			panic(err)
-		}
+		if ch != nil {
 
-		conn.WriteHeader(streams)
+			cursor := ch.que.Latest()
 
-		for {
-			packet, err := publisherConn.ReadPacket()
+			streams, err := cursor.Streams()
+
 			if err != nil {
-				break
+				panic(err)
 			}
-			conn.WritePacket(packet)
+
+			conn.WriteHeader(streams)
+
+			for {
+				packet, err := cursor.ReadPacket()
+				if err != nil {
+					break
+				}
+				conn.WritePacket(packet)
+			}
 		}
 	}
 
 	server.HandlePublish = func(conn *rtmp.Conn) {
 
-		publisherConn = conn
+		l.Lock()
+		ch := channels[conn.URL.Path]
+
+		if ch == nil {
+			ch = &Channel{}
+			ch.que = pubsub.NewQueue()
+			channels[conn.URL.Path] = ch
+		}
+		l.Unlock()
+
+		var streams []av.CodecData
+		var err error
+
+		if streams, err = conn.Streams(); err != nil {
+			panic(err)
+		}
+
+		ch.que.WriteHeader(streams)
+
+		for {
+			var pkt av.Packet
+			if pkt, err = conn.ReadPacket(); err != nil {
+				break
+			}
+
+			ch.que.WritePacket(pkt)
+		}
+
+		l.Lock()
+		delete(channels, conn.URL.Path)
+		l.Unlock()
+
+		ch.que.Close()
 
 	}
 
