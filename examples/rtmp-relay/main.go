@@ -78,7 +78,7 @@ func main() {
 			}
 		} else {
 			// stream2
-			relay("rtmp://localhost/live/stream2", conn)
+			relay("rtmp://localhost/live/stream1", conn)
 		}
 	}
 
