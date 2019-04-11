@@ -47,16 +47,24 @@ func DialTimeout(uri string, timeout time.Duration) (conn *Conn, err error) {
 		return
 	}
 
-	conn = NewConn(netconn)
+	conn = NewConn(netconn, 1024*10)
 	conn.URL = u
 	return
 }
 
 type Server struct {
+	buffersize    int
 	Addr          string
 	HandlePublish func(*Conn)
 	HandlePlay    func(*Conn)
 	HandleConn    func(*Conn)
+}
+
+func NewServer(buffersize int) *Server {
+	server := &Server{
+		buffersize: buffersize,
+	}
+	return server
 }
 
 func (self *Server) handleConn(conn *Conn) (err error) {
@@ -101,6 +109,11 @@ func (self *Server) ListenAndServe() (err error) {
 		fmt.Println("rtmp: server: listening on", addr)
 	}
 
+	buffersize := 1024 * 10
+	if self.buffersize > 0 {
+		buffersize = self.buffersize
+	}
+
 	for {
 		var netconn net.Conn
 		if netconn, err = listener.Accept(); err != nil {
@@ -111,7 +124,7 @@ func (self *Server) ListenAndServe() (err error) {
 			fmt.Println("rtmp: server: accepted")
 		}
 
-		conn := NewConn(netconn)
+		conn := NewConn(netconn, buffersize)
 		conn.isserver = true
 		go func() {
 			err := self.handleConn(conn)
@@ -199,15 +212,16 @@ func (self *txrxcount) Write(p []byte) (int, error) {
 	return n, err
 }
 
-func NewConn(netconn net.Conn) *Conn {
+// NewConn  buffersize better be  > 1024
+func NewConn(netconn net.Conn, buffersize int) *Conn {
 	conn := &Conn{}
 	conn.prober = &flv.Prober{}
 	conn.netconn = netconn
 	conn.readcsmap = make(map[uint32]*chunkStream)
 	conn.readMaxChunkSize = 128
 	conn.writeMaxChunkSize = 128
-	conn.bufr = bufio.NewReaderSize(netconn, 1024*10)
-	conn.bufw = bufio.NewWriterSize(netconn, 1024*10)
+	conn.bufr = bufio.NewReaderSize(netconn, buffersize)
+	conn.bufw = bufio.NewWriterSize(netconn, buffersize)
 	conn.txrxcount = &txrxcount{ReadWriter: netconn}
 	conn.writebuf = make([]byte, 4096)
 	conn.readbuf = make([]byte, 4096)

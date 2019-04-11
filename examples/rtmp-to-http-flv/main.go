@@ -32,7 +32,7 @@ func main() {
 
 	l := &sync.RWMutex{}
 
-	server := &rtmp.Server{}
+	server := rtmp.NewServer(1024)
 
 	server.HandlePlay = func(conn *rtmp.Conn) {
 
