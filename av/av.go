@@ -198,3 +198,83 @@ type Packet struct {
 	Time            time.Duration // packet decode time
 	Data            []byte        // packet data
 }
+
+type AudioFrame struct {
+	SampleFormat  SampleFormat // audio sample format, e.g: S16,FLTP,...
+	ChannelLayout ChannelLayout // audio channel layout, e.g: CH_MONO,CH_STEREO,...
+	SampleCount   int // sample count in this frame
+	SampleRate    int // sample rate
+	Data          [][]byte // data array for planar format len(Data) > 1
+}
+
+
+func (self AudioFrame) Duration() time.Duration {
+	return time.Second * time.Duration(self.SampleCount) / time.Duration(self.SampleRate)
+}
+
+// Check this audio frame has same format as other audio frame.
+func (self AudioFrame) HasSameFormat(other AudioFrame) bool {
+	if self.SampleRate != other.SampleRate {
+		return false
+	}
+	if self.ChannelLayout != other.ChannelLayout {
+		return false
+	}
+	if self.SampleFormat != other.SampleFormat {
+		return false
+	}
+	return true
+}
+
+// Split sample audio sample from this frame.
+func (self AudioFrame) Slice(start int, end int) (out AudioFrame) {
+	if start > end {
+		panic(fmt.Sprintf("av: AudioFrame split failed start=%d end=%d invalid", start, end))
+	}
+	out = self
+	out.Data = append([][]byte(nil), out.Data...)
+	out.SampleCount = end - start
+	size := self.SampleFormat.BytesPerSample()
+	for i := range out.Data {
+		out.Data[i] = out.Data[i][start*size : end*size]
+	}
+	return
+}
+
+// Concat two audio frames.
+func (self AudioFrame) Concat(in AudioFrame) (out AudioFrame) {
+	out = self
+	out.Data = append([][]byte(nil), out.Data...)
+	out.SampleCount += in.SampleCount
+	for i := range out.Data {
+		out.Data[i] = append(out.Data[i], in.Data[i]...)
+	}
+	return
+}
+
+
+type AudioEncoder interface {
+	CodecData() (AudioCodecData, error) // encoder's codec data can put into container
+	Setup() (error)
+	Encode(AudioFrame) ([][]byte, error) // encode raw audio frame into compressed pakcet(s)
+	Close() // close encoder, free cgo contexts
+	SetSampleRate(int) (error) // set encoder sample rate
+	SetChannelLayout(ChannelLayout) (error) // set encoder channel layout
+	SetSampleFormat(SampleFormat) (error) // set encoder sample format
+	SetBitrate(int) (error) // set encoder bitrate
+	SetOption(string,interface{}) (error) // encoder setopt, in ffmpeg is av_opt_set_dict()
+	GetOption(string,interface{}) (error) // encoder getopt
+}
+
+// AudioDecoder can decode compressed audio packets into raw audio frame.
+// use ffmpeg.NewAudioDecoder to create it.
+type AudioDecoder interface {
+	Setup() (error)
+	Decode([]byte) (bool, AudioFrame, error) // decode one compressed audio packet
+	Close() // close decode, free cgo contexts
+}
+
+// AudioResampler can convert raw audio frames in different sample rate/format/channel layout.
+type AudioResampler interface {
+	Resample(AudioFrame) (AudioFrame, error) // convert raw audio frames
+}
