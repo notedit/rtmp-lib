@@ -187,7 +187,7 @@ type AudioCodecData interface {
 	SampleFormat() SampleFormat                   // audio sample format
 	SampleRate() int                              // audio sample rate
 	ChannelLayout() ChannelLayout                 // audio channel layout
-	PacketDuration([]byte) (time.Duration, error) // get audio compressed packet duration
+	PacketDuration(data []byte) (dur time.Duration, err error)
 }
 
 // Packet stores compressed audio/video data.
@@ -264,6 +264,8 @@ type AudioEncoder interface {
 	SetBitrate(int) (error) // set encoder bitrate
 	SetOption(string,interface{}) (error) // encoder setopt, in ffmpeg is av_opt_set_dict()
 	GetOption(string,interface{}) (error) // encoder getopt
+
+	PacketDuration(data []byte) (dur time.Duration, err error)
 }
 
 // AudioDecoder can decode compressed audio packets into raw audio frame.
@@ -272,6 +274,7 @@ type AudioDecoder interface {
 	Setup() (error)
 	Decode([]byte) (bool, AudioFrame, error) // decode one compressed audio packet
 	Close() // close decode, free cgo contexts
+	PacketDuration(data []byte) (dur time.Duration, err error)
 }
 
 // AudioResampler can convert raw audio frames in different sample rate/format/channel layout.

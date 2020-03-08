@@ -88,7 +88,9 @@ func main() {
 				//aac.FillADTSHeader(adtsheader, aencodec.(aac.CodecData).Config, 1024, len(outpkt))
 				//adtsbuffer = append(adtsbuffer, adtsheader...)
 				//adtsbuffer = append(adtsbuffer, outpkt...)
+				dur,_ := enc.PacketDuration(outpkt)
 				file.Write(outpkt)
+				fmt.Println("encode dur", dur)
 				//
 				//dur, _:= aencodec.PacketDuration(outpkt)
 				//fmt.Println("encode dur", outpkt)

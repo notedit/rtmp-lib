@@ -495,6 +495,13 @@ func (self *AudioEncoder) Encode(frame av.AudioFrame) (pkts [][]byte, err error)
 	return
 }
 
+func (self *AudioEncoder) PacketDuration(data []byte) (dur time.Duration, err error) {
+	ff := &self.ff.ff
+	duration := C.av_get_audio_frame_duration(ff.codecCtx, C.int(len(data)))
+	dur = time.Duration(int(duration)) * time.Second / time.Duration(self.SampleRate)
+	return
+}
+
 func (self *AudioEncoder) Close() {
 	freeFFCtx(self.ff)
 	if self.resampler != nil {
@@ -613,8 +620,6 @@ type AudioDecoder struct {
 	Extradata []byte
 }
 
-
-
 func (self *AudioDecoder) SetSampleFormat(fmt av.SampleFormat) (err error) {
 	self.SampleFormat = fmt
 	return
@@ -676,6 +681,14 @@ func (self *AudioDecoder) Decode(pkt []byte) (gotframe bool, frame av.AudioFrame
 
 	return
 }
+
+func (self *AudioDecoder) PacketDuration(data []byte) (dur time.Duration, err error) {
+	ff := &self.ff.ff
+	duration := C.av_get_audio_frame_duration(ff.codecCtx, C.int(len(data)))
+	dur = time.Duration(int(duration)) * time.Second / time.Duration(self.SampleRate)
+	return
+}
+
 
 func (self *AudioDecoder) Close() {
 	freeFFCtx(self.ff)
