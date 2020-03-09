@@ -689,7 +689,6 @@ func (self *AudioDecoder) PacketDuration(data []byte) (dur time.Duration, err er
 	return
 }
 
-
 func (self *AudioDecoder) Close() {
 	freeFFCtx(self.ff)
 }

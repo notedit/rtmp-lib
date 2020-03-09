@@ -274,6 +274,9 @@ type AudioDecoder interface {
 	Setup() (error)
 	Decode([]byte) (bool, AudioFrame, error) // decode one compressed audio packet
 	Close() // close decode, free cgo contexts
+	SetSampleRate(int) (error) // set encoder sample rate
+	SetChannelLayout(ChannelLayout) (error) // set encoder channel layout
+	SetSampleFormat(SampleFormat) (error) // set encoder sample format
 	PacketDuration(data []byte) (dur time.Duration, err error)
 }
 
