@@ -34,7 +34,11 @@ func main() {
 
 		for _,stream := range streams {
 			if stream.Type().IsAudio() {
-				dec, _ = audio.NewAudioDecoder(stream.(av.AudioCodecData))
+				adecodec = stream.(av.AudioCodecData)
+				dec, _ = audio.NewAudioDecoderByName("aac")
+				dec.SetSampleRate(adecodec.SampleRate())
+				dec.SetSampleFormat(av.S16)
+				dec.SetChannelLayout(adecodec.ChannelLayout())
 				err = dec.Setup()
 				if err != nil {
 					fmt.Println(err)
@@ -48,7 +52,7 @@ func main() {
 				enc.SetSampleFormat(av.S16)
 				enc.SetChannelLayout(av.CH_STEREO)
 				enc.Setup()
-				adecodec = stream.(av.AudioCodecData)
+
 			}
 		}
 
