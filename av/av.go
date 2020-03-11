@@ -187,7 +187,6 @@ type AudioCodecData interface {
 	SampleFormat() SampleFormat                   // audio sample format
 	SampleRate() int                              // audio sample rate
 	ChannelLayout() ChannelLayout                 // audio channel layout
-	PacketDuration(data []byte) (dur time.Duration, err error)
 }
 
 // Packet stores compressed audio/video data.
@@ -234,7 +233,7 @@ func (self AudioFrame) Slice(start int, end int) (out AudioFrame) {
 	out = self
 	out.Data = append([][]byte(nil), out.Data...)
 	out.SampleCount = end - start
-	size := self.SampleFormat.BytesPerSample()
+	size := self.SampleFormat.BytesPerSample() * self.ChannelLayout.Count()
 	for i := range out.Data {
 		out.Data[i] = out.Data[i][start*size : end*size]
 	}
