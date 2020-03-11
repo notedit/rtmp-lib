@@ -426,9 +426,6 @@ func (self *AudioEncoder) Encode(frame av.AudioFrame) (pkts [][]byte, err error)
 		}
 	}
 
-
-	fmt.Println("FrameSampleCount", self.FrameSampleCount, frame.SampleCount)
-
 	if self.FrameSampleCount != 0 {
 		if self.framebuf.SampleCount == 0 {
 			self.framebuf = frame
