@@ -77,7 +77,7 @@ func main() {
 				continue
 			}
 
-			dur,_ := adecodec.PacketDuration(packet.Data)
+			dur,_ := dec.PacketDuration(packet.Data)
 			fmt.Println("decode dur", dur)
 
 			var _outpkts [][]byte
