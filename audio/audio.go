@@ -374,8 +374,6 @@ func (self *AudioEncoder) encodeOne(frame av.AudioFrame) (gotpkt bool, pkt []byt
 	cgotpkt := C.int(0)
 	audioFrameAssignToFF(frame, ff.frame)
 
-	fmt.Println("frame length", len(frame.Data[0]))
-
 	cerr := C.avcodec_encode_audio2(ff.codecCtx, &cpkt, ff.frame, &cgotpkt)
 	if cerr < C.int(0) {
 		err = fmt.Errorf("ffmpeg: avcodec_encode_audio2 failed: %d", cerr)
