@@ -13,6 +13,8 @@ make a clean golang rtmp lib
 - [rtmpserver](https://github.com/notedit/rtmp-lib/tree/master/examples/rtmpserver): simple rtmp server  
 - [rtmp-pull](https://github.com/notedit/rtmp-lib/tree/master/examples/rtmp-pull) rtmp pull from remote stream
 - [rtmp-relay](https://github.com/notedit/rtmp-lib/tree/master/examples/rtmp-relay) rtmp relay one stream to another stream 
+- [rtmp-bench](https://github.com/notedit/rtmp-lib/tree/master/examples/rtmp-bench) rtmp bench tools 
+
 
 ## Thanks 
 
