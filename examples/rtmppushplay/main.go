@@ -19,7 +19,9 @@ func main() {
 
 	l := &sync.RWMutex{}
 
-	server := &rtmp.Server{}
+	server := rtmp.NewServer(1024)
+
+	//rtmp.Debug = true
 
 	server.HandlePlay = func(conn *rtmp.Conn) {
 
@@ -57,7 +59,7 @@ func main() {
 		if ch == nil {
 			ch = &Channel{}
 			ch.que = pubsub.NewQueue()
-			ch.que.SetMaxGopCount(1)
+			//ch.que.SetMaxGopCount(1)
 			channels[conn.URL.Path] = ch
 		}
 		l.Unlock()

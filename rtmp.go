@@ -47,22 +47,27 @@ func DialTimeout(uri string, timeout time.Duration) (conn *Conn, err error) {
 		return
 	}
 
-	conn = NewConn(netconn, 1024*10)
+	conn = NewConn(netconn, 1024*100)
 	conn.URL = u
 	return
 }
 
+type Config struct {
+	ChunkSize  int
+	BufferSize int
+}
+
 type Server struct {
-	buffersize    int
+	config        *Config
 	Addr          string
 	HandlePublish func(*Conn)
 	HandlePlay    func(*Conn)
 	HandleConn    func(*Conn)
 }
 
-func NewServer(buffersize int) *Server {
+func NewServer(config *Config) *Server {
 	server := &Server{
-		buffersize: buffersize,
+		config:config,
 	}
 	return server
 }
@@ -109,10 +114,6 @@ func (self *Server) ListenAndServe() (err error) {
 		fmt.Println("rtmp: server: listening on", addr)
 	}
 
-	buffersize := 1024 * 10
-	if self.buffersize > 0 {
-		buffersize = self.buffersize
-	}
 
 	for {
 		var netconn net.Conn
@@ -124,7 +125,7 @@ func (self *Server) ListenAndServe() (err error) {
 			fmt.Println("rtmp: server: accepted")
 		}
 
-		conn := NewConn(netconn, buffersize)
+		conn := NewConn(netconn, self.config.BufferSize)
 		conn.isserver = true
 		go func() {
 			err := self.handleConn(conn)
@@ -369,6 +370,7 @@ func (self *Conn) writeBasicConf() (err error) {
 	if err = self.writeSetChunkSize(1024 * 1024 * 128); err != nil {
 		return
 	}
+
 	// > WindowAckSize
 	if err = self.writeWindowAckSize(5000000); err != nil {
 		return
@@ -929,12 +931,14 @@ func (self *Conn) WriteHeader(streams []av.CodecData) (err error) {
 func (self *Conn) tmpwbuf(n int) []byte {
 	if len(self.writebuf) < n {
 		self.writebuf = make([]byte, n)
+		fmt.Println("write buf ==== ", n)
 	}
 	return self.writebuf
 }
 
 func (self *Conn) writeSetChunkSize(size int) (err error) {
 	self.writeMaxChunkSize = size
+	fmt.Println("writeMaxChunkSize ===========  ", self.writeMaxChunkSize)
 	b := self.tmpwbuf(chunkHeaderLength + 4)
 	n := self.fillChunkHeader(b, 2, 0, msgtypeidSetChunkSize, 0, 4)
 	pio.PutU32BE(b[n:], uint32(size))
