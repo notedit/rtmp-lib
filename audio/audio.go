@@ -1,11 +1,12 @@
 package audio
 
 /*
-#cgo LDFLAGS: -lavformat -lavutil -lavcodec -lavresample
+#cgo LDFLAGS: -lavformat -lavutil -lavcodec -lswresample
+#cgo CFLAGS: -Wno-deprecated
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libavutil/avutil.h>
-#include <libavresample/avresample.h>
+#include <libswresample/swresample.h>
 #include <libavutil/opt.h>
 #include <string.h>
 
@@ -29,13 +30,10 @@ int wrap_avcodec_decode_audio4(AVCodecContext *ctx, AVFrame *frame, void *data, 
 	struct AVPacket pkt = {.data = data, .size = size};
 	return avcodec_decode_audio4(ctx, frame, got, &pkt);
 }
-int wrap_avresample_convert(AVAudioResampleContext *avr, int *out, int outsize, int outcount, int *in, int insize, int incount) {
-	return avresample_convert(avr, (void *)out, outsize, outcount, (void *)in, insize, incount);
+int wrap_swresample_convert(SwrContext *avr, int *out, int outcount, int *in,  int incount) {
+	return swr_convert(avr, (void *)out, outcount, (void *)in, incount);
 }
 
-void ffinit() {
-	av_register_all();
-}
 */
 import "C"
 
@@ -48,9 +46,6 @@ import (
 	"unsafe"
 )
 
-func init() {
-	C.ffinit()
-}
 
 type ffctx struct {
 	ff C.FFCtx
@@ -60,7 +55,7 @@ type Resampler struct {
 	inSampleFormat, OutSampleFormat   av.SampleFormat
 	inChannelLayout, OutChannelLayout av.ChannelLayout
 	inSampleRate, OutSampleRate       int
-	avr                               *C.AVAudioResampleContext
+	avr                               *C.SwrContext
 }
 
 func (self *Resampler) Resample(in av.AudioFrame) (out av.AudioFrame, err error) {
@@ -73,14 +68,14 @@ func (self *Resampler) Resample(in av.AudioFrame) (out av.AudioFrame, err error)
 		self.inSampleFormat = in.SampleFormat
 		self.inSampleRate = in.SampleRate
 		self.inChannelLayout = in.ChannelLayout
-		avr := C.avresample_alloc_context()
+		avr := C.swr_alloc()
 		C.av_opt_set_int(unsafe.Pointer(avr), C.CString("in_channel_layout"), C.int64_t(channelLayoutAV2FF(self.inChannelLayout)), 0)
 		C.av_opt_set_int(unsafe.Pointer(avr), C.CString("out_channel_layout"), C.int64_t(channelLayoutAV2FF(self.OutChannelLayout)), 0)
 		C.av_opt_set_int(unsafe.Pointer(avr), C.CString("in_sample_rate"), C.int64_t(self.inSampleRate), 0)
 		C.av_opt_set_int(unsafe.Pointer(avr), C.CString("out_sample_rate"), C.int64_t(self.OutSampleRate), 0)
 		C.av_opt_set_int(unsafe.Pointer(avr), C.CString("in_sample_fmt"), C.int64_t(sampleFormatAV2FF(self.inSampleFormat)), 0)
 		C.av_opt_set_int(unsafe.Pointer(avr), C.CString("out_sample_fmt"), C.int64_t(sampleFormatAV2FF(self.OutSampleFormat)), 0)
-		C.avresample_open(avr)
+		C.swr_init(avr)
 		self.avr = avr
 	}
 
@@ -98,8 +93,10 @@ func (self *Resampler) Resample(in av.AudioFrame) (out av.AudioFrame, err error)
 		inData[i] = (*C.uint8_t)(unsafe.Pointer(&in.Data[i][0]))
 	}
 
+	fmt.Println(inLinesize)
+
 	var outChannels, outLinesize, outBytesPerSample int
-	outSampleCount := int(C.avresample_get_out_samples(self.avr, C.int(in.SampleCount)))
+	outSampleCount := int(C.swr_get_out_samples(self.avr, C.int(in.SampleCount)))
 	if !self.OutSampleFormat.IsPlanar() {
 		outChannels = 1
 		outBytesPerSample = self.OutSampleFormat.BytesPerSample() * self.OutChannelLayout.Count()
@@ -119,10 +116,10 @@ func (self *Resampler) Resample(in av.AudioFrame) (out av.AudioFrame, err error)
 	out.SampleFormat = self.OutSampleFormat
 	out.SampleRate = self.OutSampleRate
 
-	convertSamples := int(C.wrap_avresample_convert(
+	convertSamples := int(C.wrap_swresample_convert(
 		self.avr,
-		(*C.int)(unsafe.Pointer(&outData[0])), C.int(outLinesize), C.int(outSampleCount),
-		(*C.int)(unsafe.Pointer(&inData[0])), C.int(inLinesize), C.int(inSampleCount),
+		(*C.int)(unsafe.Pointer(&outData[0])),  C.int(outSampleCount),
+		(*C.int)(unsafe.Pointer(&inData[0])), C.int(inSampleCount),
 	))
 	if convertSamples < 0 {
 		err = fmt.Errorf("ffmpeg: avresample_convert_frame failed")
@@ -144,7 +141,7 @@ func (self *Resampler) Resample(in av.AudioFrame) (out av.AudioFrame, err error)
 }
 
 func (self *Resampler) Close() {
-	C.avresample_free(&self.avr)
+	C.swr_free(&self.avr)
 }
 
 func newFFCtxByCodec(codec *C.AVCodec) (ff *ffctx, err error) {
