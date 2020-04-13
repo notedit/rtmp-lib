@@ -367,6 +367,7 @@ var CodecTypes = flv.CodecTypes
 
 func (self *Conn) writeBasicConf() (err error) {
 	// > SetChunkSize
+
 	if err = self.writeSetChunkSize(1024 * 1024 * 128); err != nil {
 		return
 	}
@@ -938,7 +939,6 @@ func (self *Conn) tmpwbuf(n int) []byte {
 
 func (self *Conn) writeSetChunkSize(size int) (err error) {
 	self.writeMaxChunkSize = size
-	fmt.Println("writeMaxChunkSize ===========  ", self.writeMaxChunkSize)
 	b := self.tmpwbuf(chunkHeaderLength + 4)
 	n := self.fillChunkHeader(b, 2, 0, msgtypeidSetChunkSize, 0, 4)
 	pio.PutU32BE(b[n:], uint32(size))

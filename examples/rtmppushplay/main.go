@@ -1,77 +1,50 @@
 package main
 
 import (
-	"sync"
-
+	"fmt"
 	"github.com/notedit/rtmp-lib/av"
+	"time"
 
 	rtmp "github.com/notedit/rtmp-lib"
-	"github.com/notedit/rtmp-lib/pubsub"
 )
 
-type Channel struct {
-	que *pubsub.Queue
-}
 
-var channels = map[string]*Channel{}
+var pubstream *rtmp.Conn
+var playstream *rtmp.Conn
+
+var start bool
 
 func main() {
 
-	l := &sync.RWMutex{}
-
-	server := rtmp.NewServer(1024)
+	config := &rtmp.Config{
+		ChunkSize:  128,
+		BufferSize: 0,
+	}
+	server := rtmp.NewServer(config)
 
 	//rtmp.Debug = true
 
 	server.HandlePlay = func(conn *rtmp.Conn) {
 
-		l.RLock()
-		ch := channels[conn.URL.Path]
-		l.RUnlock()
+		playstream = conn
 
-		if ch != nil {
+		streams,_ := pubstream.Streams()
+		playstream.WriteHeader(streams)
 
-			cursor := ch.que.Latest()
 
-			streams, err := cursor.Streams()
-
-			if err != nil {
-				panic(err)
-			}
-
-			conn.WriteHeader(streams)
-
-			for {
-				packet, err := cursor.ReadPacket()
-				if err != nil {
-					break
-				}
-				conn.WritePacket(packet)
-			}
+		for {
+			time.Sleep(time.Second)
 		}
 	}
 
 	server.HandlePublish = func(conn *rtmp.Conn) {
 
-		l.Lock()
-		ch := channels[conn.URL.Path]
+		pubstream = conn
 
-		if ch == nil {
-			ch = &Channel{}
-			ch.que = pubsub.NewQueue()
-			//ch.que.SetMaxGopCount(1)
-			channels[conn.URL.Path] = ch
-		}
-		l.Unlock()
-
-		var streams []av.CodecData
-		var err error
-
-		if streams, err = conn.Streams(); err != nil {
+		_, err := conn.Streams()
+		if err != nil {
 			panic(err)
 		}
-
-		ch.que.WriteHeader(streams)
 
 		for {
 			var pkt av.Packet
@@ -79,15 +52,12 @@ func main() {
 				break
 			}
 
-			ch.que.WritePacket(pkt)
+			if playstream != nil {
+				playstream.WritePacket(pkt)
+			}
+
+			fmt.Println("publish ", pkt.Time)
 		}
-
-		l.Lock()
-		delete(channels, conn.URL.Path)
-		l.Unlock()
-
-		ch.que.Close()
-
 	}
 
 	server.ListenAndServe()
